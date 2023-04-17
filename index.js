@@ -1,6 +1,9 @@
 var chance = require('chance').Chance();
 const murmurHash3 = require('murmur-hash').v3;
 const axios = require('axios');
+const {
+    subtle
+} = require('crypto').webcrypto;
 
 const browserData = require('./browsers.js');
 
@@ -8,7 +11,7 @@ class OpensourceFPgen {
     constructor(browser) {
         this._version = '3.3.3';
 
-        const supportedBrowsers = ['chrome', 'edge'];
+        const supportedBrowsers = ['chrome'];
         if (!supportedBrowsers.includes(browser)) throw Error(`${browser} is not in the supported browsers list: ${supportedBrowsers.join(' ')}`);
 
         this._browser = browser;
@@ -379,18 +382,168 @@ class FingerprintProGen {
         return targetObj;
     }
 
+    getRandomReferer() {
+        const referers = [
+            'https://www.google.com/',
+            'https://www.bing.com/',
+            'https://www.yahoo.com/',
+            'https://www.facebook.com/',
+            'https://www.twitter.com/',
+            'https://www.instagram.com/',
+            'https://www.reddit.com/',
+            'https://www.amazon.com/'
+        ];
+        const randomIndex = Math.floor(Math.random() * referers.length);
+        return referers[randomIndex];
+    }
 
-    createData() {
+    generateChromeUserAgent() {
+        const versions = ['86', '87', '88', '89', '90', '91', '92', '93', '94'];
+        const platformVersions = ['10.0.0', '10.0.1', '10.0.2', '10.0.3', '10.0.4', '10.0.5'];
+        const architecture = ['Win32', 'Win64'];
+
+        const version = versions[Math.floor(Math.random() * versions.length)];
+        const platformVersion = platformVersions[Math.floor(Math.random() * platformVersions.length)];
+        const arch = architecture[Math.floor(Math.random() * architecture.length)];
+
+        this.userAgent = `Mozilla/5.0 (Windows NT ${platformVersion}; ${arch}; rv:${version}) Gecko/20100101 Chrome/${version}.0.${Math.floor(Math.random() * 1000)}.0`;
+        this.uaVersion = version;
+
+        const ua = {
+            b: [{
+                b: 'Google Chrome',
+                v: version
+            }],
+            m: false,
+            p: 'Windows',
+            h: {
+                brands: '[{\"brand\":\"Google Chrome\",\"version\":\"' + version + '\"}]',
+                mobile: 'false',
+                platform: 'Windows',
+                platformVersion: platformVersion,
+                architecture: arch,
+                bitness: arch === 'Win64' ? '64' : '32',
+                model: '',
+                uaFullVersion: version + '.0.' + Math.floor(Math.random() * 1000) + '.0'
+            },
+            nah: []
+        };
+
+        return ua;
+    }
+
+    generateRandomIpAddress() {
+        const octets = [];
+        for (let i = 0; i < 4; i++) {
+            octets.push(Math.floor(Math.random() * 256));
+        }
+        return octets.join('.');
+    }
+
+    shortBase64Encode(bytes) {
+        const base64Chars =
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
+        let result = "";
+        const n = bytes.length;
+        for (let i = 0; i < n; i += 3) {
+            const byte1 = bytes[i];
+            const byte2 = bytes[i + 1];
+            const byte3 = bytes[i + 2];
+            const index1 = byte1 >> 2;
+            const index2 = ((byte1 & 3) << 4) | (byte2 >> 4);
+            const index3 = ((byte2 & 15) << 2) | (byte3 >> 6);
+            const index4 = byte3 & 63;
+            result +=
+                base64Chars[index1] +
+                base64Chars[index2] +
+                (i + 1 < n ? base64Chars[index3] : "=") +
+                (i + 2 < n ? base64Chars[index4] : "=");
+        }
+        return result;
+    }
+
+    async generateKeys() {
+        const keyPromises = [
+            subtle.generateKey({
+                    name: "AES-GCM",
+                    length: 128
+                },
+                true,
+                ["encrypt"]
+            ),
+            subtle.generateKey({
+                    name: "AES-GCM",
+                    length: 128
+                },
+                true,
+                ["encrypt"]
+            )
+        ];
+        const [key1, key2] = await Promise.all(keyPromises);
+        const keyBytes1 = new Uint8Array(await subtle.exportKey("raw", key1));
+        const keyBytes2 = new Uint8Array(await subtle.exportKey("raw", key2));
+        const encryptedKeyBytes = new Uint8Array(keyBytes1.length);
+        for (let i = 0; i < keyBytes1.length; i++) {
+            encryptedKeyBytes[i] = 165 ^ keyBytes1[i] ^ keyBytes2[i];
+        }
+        return await this.shortBase64Encode(encryptedKeyBytes);
+    }
+
+    generateRandomNumbers () {
+        for (var e = [], t = Math.random(), n = 24575; n >= 0; --n)
+            if (n % 4096 == 0) {
+                var r = Math.random();
+                e.push((t - r) * Math.pow(2, 31) | 0), t = r
+            } return e
+    }
+
+    performanceTest () {
+        for (var t = 1, n = 1, r = performance.now(), i = r, o = 0; o < 50000; o++)
+            if ((r = i) < (i = performance.now())) {
+                var a = i - r;
+                a > t ? a < n && (n = a) : a < t && (n = t, t = a)
+            } return [t * 1000, n * 1000]
+    }
+
+    generateRandomWebGLContext() {
+        const vendors = ["WebKit", "Mozilla", "Microsoft"];
+        const vendorUnmaskedPrefixes = ["Google Inc.", "Apple Inc.", "Mozilla Corporation"];
+        const rendererPrefixes = ["WebKit", "ANGLE", "Mesa"];
+        const rendererSuffixes = ["Direct3D11 vs_5_0 ps_5_0", "OpenGL ES 2.0", "OpenGL 4.5"];
+        const shadingLanguageVersions = ["WebGL GLSL ES 1.0", "OpenGL ES GLSL ES 3.0", "OpenGL GLSL 4.6"];
+      
+        const randomVendor = vendors[Math.floor(Math.random() * vendors.length)];
+        const randomVendorUnmaskedPrefix = vendorUnmaskedPrefixes[Math.floor(Math.random() * vendorUnmaskedPrefixes.length)];
+        const randomRendererPrefix = rendererPrefixes[Math.floor(Math.random() * rendererPrefixes.length)];
+        const randomRendererSuffix = rendererSuffixes[Math.floor(Math.random() * rendererSuffixes.length)];
+        const randomShadingLanguageVersion = shadingLanguageVersions[Math.floor(Math.random() * shadingLanguageVersions.length)];
+      
+        const contextInfo = {
+          version: "WebGL 1.0 (OpenGL ES 2.0 " + randomVendorUnmaskedPrefix + ")",
+          vendor: randomVendor,
+          vendorUnmasked: randomVendorUnmaskedPrefix + " (" + randomRendererPrefix + ")",
+          renderer: randomRendererPrefix + " WebGL",
+          rendererUnmasked: randomRendererPrefix + " " + randomRendererSuffix + " " + randomShadingLanguageVersion,
+          shadingLanguageVersion: randomShadingLanguageVersion + " (OpenGL ES " + randomShadingLanguageVersion.slice(-3) + " " + randomRendererSuffix + ")"
+        };
+      
+        return contextInfo;
+      }
+
+    async createData() {
+        let ts = Date.now();
+        let keys = await this.generateKeys();
+        
         // Check some extra values that might be in the actual payload like 'cr': referer etc
         const data = {
+            cbd: 1, // Expanded result: 1 if enabled
+            cr: this.getRandomReferer(),
             c: this._token,
             url: this._url,
             t: this._tag,
             lid: this._user,
             s1: this.possibleNullVal(this._osComps.osCpu, -1),
-            s2: [
-                this.originalVal(this._osComps.languages)
-            ],
+            s2: this.originalVal(this._osComps.languages), // TODO: Something not right
             s3: this.originalVal(this._osComps.colorDepth),
             s4: this.possibleNullVal(this._osComps.deviceMemory, -1),
             s5: this.transformValue(this._osComps.screenResolution, ((e) => {
@@ -403,14 +556,19 @@ class FingerprintProGen {
                 }
             })),
             s6: {
-                s: -1,
-                v: null // 'TODO'
-            }, // this.numberValue(r[5])
+                s: 0,
+                v: [
+                    0,
+                    0,
+                    40,
+                    0
+                ]
+            },
             s7: this.possibleNullVal(this._osComps.hardwareConcurrency, -1),
             s8: {
-                s: -1,
-                v: null // 'TODO'
-            }, // this.numberValue(r[6]),
+                s: -2,
+                v: null
+            },
             s9: this.originalVal(this._osComps.timezone),
             s10: this.originalVal(this._osComps.sessionStorage),
             s11: this.originalVal(this._osComps.localStorage),
@@ -429,9 +587,9 @@ class FingerprintProGen {
                 }
             })),
             s18: {
-                s: -1,
-                v: null // 'TODO'
-            }, // this.numberValue(r[7]),
+                s: 0,
+                v: keys
+            },
             s19: this.originalVal(this._osComps.touchSupport),
             s20: this.originalVal(this._osComps.fonts),
             s21: this.transformValue(this._osComps.audio, ((e) => {
@@ -444,40 +602,47 @@ class FingerprintProGen {
                 }
             })),
             s22: {
-                s: -1,
-                v: null // 'TODO'
-            }, // this.possibleNullVal(r[10], -1)
+                s: 0,
+                v: 23
+            }, // Always 23 on chrome: webAssambly checks
             s24: {
-                s: -1,
-                v: null // 'TODO'
-            }, // this.possibleNullVal(r[31]),
+                s: 0,
+                v: 33
+            }, // Always 33: eval.toString().length
             s26: {
-                s: -1,
-                v: null // 'TODO'
-            }, // this.numberValue(r[8]),
+                s: 0,
+                v: [
+                    ',,ai,',
+                    ',,vi,',
+                    ',,ao,'
+                ]
+            },
             s27: this.originalVal(this._osComps.vendor),
             s28: this.originalVal(this._osComps.vendorFlavors),
             s30: {
                 s: -1,
-                v: null // 'TODO'
-            }, // this.possibleNullVal(r[11], -1)
+                v: null
+            }, // nagivator.doNotTrack
             s31: {
-                s: -1,
-                v: null // 'TODO'
-            }, // this.possibleNullVal(r[4]),
+                s: 0,
+                v: false
+            }, // localstorage check,
             s32: this.originalVal(this._osComps.cookiesEnabled),
             s33: {
-                s: -1,
-                v: null // 'TODO'
-            }, // this.possibleNullVal(r[12]),
+                s: 0,
+                v: false
+            }, // Webdriver checks,
             s34: {
-                s: -1,
-                v: null // 'TODO'
-            }, // this.boolValue(r[0])
+                s: 0,
+                v: [
+                    `candidate:${Math.floor(Math.random() * 4294967295)} 1 udp ${Math.floor(Math.random() * 4294967295)} 4f6f7a6c-c7c1-406a-83d7-436e23a792d6.local 50499 typ host generation 0 ufrag vRsD network-cost 999`,
+                    `candidate:${Math.floor(Math.random() * 4294967295)} 1 udp ${Math.floor(Math.random() * 4294967295)} ${this.generateRandomIpAddress()} 50499 typ srflx raddr 0.0.0.0 rport 0 generation 0 ufrag vRsD network-cost 999`
+                ]
+            },
             s35: {
                 s: -1,
-                v: null // 'TODO'
-            }, // this.boolValue(r[3])
+                v: null
+            }, // canMakePayments check
             s36: this.possibleNullVal(this._osComps.domBlockers, -1),
             s37: this.possibleNullVal(this._osComps.colorGamut, -1),
             s38: this.possibleNullVal(this._osComps.contrast, -1),
@@ -487,13 +652,16 @@ class FingerprintProGen {
             s42: this.possibleNullVal(this._osComps.monochrome, -1),
             s43: this.possibleNullVal(this._osComps.reducedMotion, -1),
             s44: {
-                s: -1,
-                v: null // 'TODO'
-            }, // this.possibleNullVal(r[13], -1)
+                s: 0,
+                v: true
+            }, // prefers-color-scheme true
             s45: {
-                s: -1,
-                v: null // 'TODO'
-            }, // this.originalVal(r[14])
+                s: 0,
+                v: [
+                    ts,
+                    ts - 60000 * -120 // on(e), on(e - 6e4 * (new Date).getTimezoneOffset()) -> TODO: Need to optimize this
+                ] // 'TODO'
+            },
             s46: this.transformValue(this._osComps.math, ((e) => {
                 return {
                     s: 0,
@@ -503,9 +671,18 @@ class FingerprintProGen {
                 }
             })),
             s47: {
-                s: -1,
-                v: null // 'TODO'
-            }, //this.transformValue(r.j, (function (e) {
+                s: 0,
+                v: {
+                    contextAttributes: '6b1ed336830d2bc96442a9d76373252a',
+                    parameters: '075059ba9f7f481e812230b5f31166f9',
+                    shaderPrecisions: 'f223dfbcd580cf142da156d93790eb83',
+                    extensions: 'f07cb741e70d772f1117c7daddaf6139',
+                    extensionParameters: '2a487faca86410cd30917a7e5ce9c0ce',
+                    fingerprint: '0429243e321375cb15607af79c3ec45f',
+                    ...
+                    this.generateRandomWebGLContext()
+                }
+            }, //TODO: this.transformValue(r.j, (function (e) {
             //     return {
             //         s: e ? 0 : -1,
             //         v: e ? this.mergeObjects(this.mergeObjects({}, e), {
@@ -519,102 +696,115 @@ class FingerprintProGen {
             //     }
             // })),
             s48: {
-                s: -1,
-                v: null // 'TODO'
-            }, // this.originalVal(r[15])
+                s: 0,
+                v: this.generateRandomNumbers()
+            },
             s49: {
-                s: -1,
-                v: null // 'TODO'
-            }, // this.possibleNullVal(r[16], -1)
+                s: 0,
+                v: this.performanceTest()
+            },
             s50: {
-                s: -1,
-                v: null // 'TODO'
-            }, // this.possibleNullVal(r[17], -1)
+                s: 0,
+                v: 3760000000
+            }, // jsHeapSizeLimit TODO: check it
             s51: this.originalVal(this._osComps.fontPreferences),
             s52: {
-                s: -1,
-                v: null // 'TODO'
-            }, //this.transformValue(r[2], (function (e) {
+                s: 0,
+                v: 'ad2ebbde59ec05165637d3c71875dee2' // Voices checksum
+            }, // TODO: this.transformValue(r[2], (function (e) {
             //     return {
             //         s: "number" == typeof e ? e : e.length ? 0 : 1,
             //         v: "number" == typeof e ? "" : murmurHash3.x64.hash128(JSON.stringify(e))
             //     }
             // })), 
             s53: {
-                s: -1,
-                v: null // 'TODO'
-            }, // this.boolValue(r[18])
+                s: 2,
+                v: [
+                    "fun",
+                    "fun"
+                ]
+            }, // Not sure
             s54: {
-                s: -1,
-                v: null // 'TODO'
-            }, // this.numberValue(r[1])
-            s55: { // Visitor token -> token you get from being a visitor already
+                s: -2,
+                v: null
+            }, // Not sure
+            s55: { // Visitor token -> token you get from being a visitor already. So null alwatys
                 s: -1,
                 v: null
             },
             s56: {
                 s: -1,
-                v: null // 'TODO'
-            }, // TLS token
+                v: null
+            }, // TLS token, not needed but helps for better results
             s57: {
-                s: -1,
-                v: null // 'TODO'
-            }, // this.possibleNullVal(r[19], -1)
+                s: 0,
+                v: chance.integer({
+                    min: 1,
+                    max: 2
+                })
+            }, // TODO: this.possibleNullVal(r[19], -1)
             s58: {
-                s: -1,
-                v: null // 'TODO'
-            }, // this.possibleNullVal(r[9], -1)
+                s: 0,
+                v: this.generateChromeUserAgent()
+            },
             s59: {
-                s: -1,
-                v: null // 'TODO'
-            }, // this.originalValue(r[20])
+                s: 0,
+                v: false
+            }, // TODO: this.originalValue(r[20])
             s60: {
-                s: -1,
-                v: null // 'TODO'
-            }, // this.originalValue(r[21])
+                s: 0,
+                v: false
+            }, // TODO: this.originalValue(r[21])
             s61: {
-                s: -1,
-                v: null // 'TODO'
-            }, // this.originalValue(r[22])
+                s: 0,
+                v: true
+            }, // TODO: this.originalValue(r[22])
             s62: {
-                s: -1,
-                v: null // 'TODO'
-            }, // this.originalValue(r[23])
+                s: 0,
+                v: false
+            }, // FALSE: this.originalValue(r[23])
             s63: {
-                s: -1,
-                v: null // 'TODO'
-            }, // this.originalValue(r[24])
+                s: 0,
+                v: false
+            }, // TODO: this.originalValue(r[24])
             s64: {
-                s: -1,
-                v: null // 'TODO'
-            }, // this.originalValue(r[25])
+                s: 0,
+                v: false
+            }, // TODO: this.originalValue(r[25])
             s65: {
-                s: -1,
-                v: null // 'TODO'
-            }, // this.originalValue(r[26])
+                s: 0,
+                v: false
+            }, // TODO: this.originalValue(r[26])
             s66: {
                 s: -1,
-                v: null // 'TODO'
-            }, // this.possibleNullVal(r[27], -1)
-            s67: { // customComponents, for EQL there are none. Possibly for other sites there are
+                v: null
+            }, // TODO: this.possibleNullVal(r[27], -1)
+            s67: {
                 s: -1,
                 v: null
-            },
+            }, // customComponents, for EQL there are none. Possibly for other sites there are
             s68: {
-                s: -1,
-                v: null // 'TODO'
-            }, // this.originalValue(r[28])
+                s: 0,
+                v: false
+            }, // TODO: this.originalValue(r[28])
             s69: {
-                s: -1,
-                v: null // 'TODO'
-            }, // this.boolValue(r[29])
+                s: 0,
+                v: [{
+                    l: this._url,
+                    f: ''
+                }] // 'TODO'
+            }, // TODO: this.boolValue(r[29])
             s71: {
-                s: -1,
-                v: null // 'TODO'
-            }, // this.originalValue(r[30])
+                s: 0,
+                v: {
+                    w: this._url,
+                    l: this._url,
+                    a: []
+                }
+            }, // TODO: this.originalValue(r[30])
         };
-        
-        console.log(JSON.stringify(data))
+
+        //console.log(JSON.stringify(data))
         return data
     };
 
@@ -682,25 +872,24 @@ class FingerprintProGen {
 
     async submitData(nonEncodedData, responseFormat = 'binary') {
         const body = this.encodeData(nonEncodedData, [3, 7], 3, 7);
-        
+
         const config = {
             method: 'POST',
             url: `${this._endpoint}?ci=js/${this._version}`,
             headers: { // fix the headers
                 'accept': '*/*',
                 'accept-encoding': 'gzip, deflate, br',
-                'accept-language': 'nl-NL,nl;q=0.9,en-US;q=0.8,en;q=0.7',
                 'cache-control': 'no-cache',
-                'content-type': 'text/plain', 
+                'content-type': 'text/plain',
                 'origin': new URL(this._url).origin,
                 'pragma': 'no-cache',
-                'sec-ch-ua': `"Chromium";v="112", "Google Chrome";v="112", "Not:A-Brand";v="99"`,
+                'sec-ch-ua': `"Chromium";v="${this.uaVersion}", "Google Chrome";v="${this.uaVersion}", "Not:A-Brand";v="99"`,
                 'sec-ch-ua-mobile': '?0',
                 'sec-ch-ua-platform': '"Windows"',
                 'sec-fetch-dest': 'empty',
                 'sec-fetch-mode': 'cors',
                 'sec-fetch-site': 'cross-site',
-                'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36',
+                'user-agent': this.userAgent,
             },
             timeout: 5000,
             responseType: responseFormat === 'binary' ? 'arraybuffer' : 'text',
@@ -709,7 +898,10 @@ class FingerprintProGen {
 
         try {
             const response = await axios(config);
-            console.log(this.decompressData(response.data, [3, 7], 7).products);
+            const decompressedData = this.decompressData(response.data, [3, 7], 7);
+            //console.log(decompressedData)
+            console.log(JSON.stringify(decompressedData))
+            console.log(decompressedData.products.identification.data.result)
         } catch (error) {
             const decompressedData = this.decompressData(error.response.data, [3, 7], 7);
             console.log(decompressedData.products)
@@ -718,7 +910,7 @@ class FingerprintProGen {
 };
 
 
-const run = () => {
+const run = async () => {
     const osGen = new OpensourceFPgen(
         'chrome'
     );
@@ -729,12 +921,11 @@ const run = () => {
         'aOJXIJqnGJ53Jd2HbLIP',
         'https://metrics.eql.xyz/',
         'https://launch.footlocker.nl/nl-NL/launch/mens-air-jordan-1-high-og-lucky-green-nl',
-        'test@gmail.com', 
-        {
+        'test@gmail.com', {
             drawId: '123'
         }
     );
-    const data = proGen.createData();
+    const data = await proGen.createData();
     proGen.submitData(data)
 };
 run()
