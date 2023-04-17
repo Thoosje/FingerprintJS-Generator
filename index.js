@@ -899,9 +899,14 @@ class FingerprintProGen {
         try {
             const response = await axios(config);
             const decompressedData = this.decompressData(response.data, [3, 7], 7);
-            //console.log(decompressedData)
-            console.log(JSON.stringify(decompressedData))
-            console.log(decompressedData.products.identification.data.result)
+            
+            //console.log(JSON.stringify(decompressedData))
+            //console.log(decompressedData.products.identification.data.result)
+
+            return {
+                visitorId: decompressedData.products.identification.data.result.visitorId,
+                requestId: decompressedData.requestId
+            }
         } catch (error) {
             const decompressedData = this.decompressData(error.response.data, [3, 7], 7);
             console.log(decompressedData.products)
@@ -926,6 +931,16 @@ const run = async () => {
         }
     );
     const data = await proGen.createData();
-    proGen.submitData(data)
+    const proResult = await proGen.submitData(data)
+    
+    return {
+        osVisitorId: osData.visitorId,
+        ...
+        proResult
+    }
 };
-run()
+
+(async () => {
+    let result = await run();
+    console.log(result)
+})()
